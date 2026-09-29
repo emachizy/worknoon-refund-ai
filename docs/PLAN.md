@@ -1,5 +1,7 @@
 # Build Plan
 
+> Historical: the phased plan this project was built from, kept for context. For what was actually built, see the README and the other files in `docs/`. Some items here were intentionally not implemented, such as the optional human-review endpoint.
+
 ## Phase 0 — Scaffold and run
 Goal: app boots locally and via Docker.
 - Install dependencies.

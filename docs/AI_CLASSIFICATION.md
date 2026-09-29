@@ -96,3 +96,13 @@ Worst-case latency is therefore about two timeouts.
 - **When the AI is not called at all.** If the customer or order doesn't exist, or the order belongs to someone else, the message is never sent to the AI and the request is denied on facts.
 - **What is logged.** Provider, model, attempt, duration, failure kind, HTTP status, provider error code, and request id.
 - **What is not logged or returned.** Provider error messages (OpenAI auth errors echo part of the key), the API key, customer text, and model output. Schema failures log only the failing field paths.
+
+## Live verification status
+- **Covered by automated tests (no network calls):** the OpenAI provider boundary, the request contents, structured-output validation, retries, and the timeout, provider-error, invalid-output and refusal paths. Security behaviour is covered too: no key or provider text in errors, logs or responses.
+- **Live smoke test, against the Docker stack with a real key:**
+  - the key authenticated;
+  - the account returned HTTP 429 `insufficient_quota` / `credit_balance_exhausted`;
+  - both test requests were correctly escalated with `AI_CLASSIFICATION_UNAVAILABLE` (`decidedBy: WORKFLOW`);
+  - the customer saw only the generic review message;
+  - neither the provider's error text nor the key appeared in logs or stored records.
+- **Not verified:** a successful live classification, meaning OpenAI accepting the structured-output schema and returning e.g. `DAMAGED_ITEM`. This needs an account with API credit.

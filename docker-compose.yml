@@ -1,3 +1,6 @@
+# Fixed project name: container, network and volume names do not depend on the clone folder name.
+name: worknoon-refund-ai
+
 services:
   mongo:
     image: mongo:8

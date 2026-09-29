@@ -23,11 +23,13 @@ let mongo: MongoMemoryServer;
 let alice: mongoose.Types.ObjectId;
 let bob: mongoose.Types.ObjectId;
 
+// The first run downloads a mongod binary (hundreds of MB on Windows), so allow time for it.
+// Set MONGOMS_SYSTEM_BINARY to an installed mongod to skip the download.
 beforeAll(async () => {
   mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
   await Promise.all([Customer.init(), Order.init(), RefundRequest.init()]);
-}, 120_000);
+}, 600_000);
 
 afterAll(async () => {
   await mongoose.disconnect();

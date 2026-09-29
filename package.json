@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "concurrently \"npm --prefix apps/api run dev\" \"npm --prefix apps/web run dev\"",
     "install:all": "npm install --prefix apps/api && npm install --prefix apps/web",
-    "test": "npm --prefix apps/api test",
+    "test": "npm --prefix apps/api test && npm --prefix apps/web test",
     "build": "npm --prefix apps/api run build && npm --prefix apps/web run build"
   },
   "devDependencies": {

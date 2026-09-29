@@ -126,7 +126,8 @@ Each workflow run emits one structured `refund request decided` log with `reques
 
 ## Duplicate submissions
 - **With a key.** When the client sends an `Idempotency-Key`, a double submission returns the original record. Concurrent duplicates are resolved by the unique index: the losing insert returns the winner's record.
-- **Without a key.** Each submission is a separate attempt. The current web UI does not send a key yet (Phase 5 should generate one per form submission and disable the button while it is in flight).
+- **Without a key.** Each submission is a separate attempt.
+- **The web UI** generates one key per logical request (reused on retry, new for each new request) and disables the submit button while a request is in flight.
 
 ## AI classification layer
 `apps/api/src/services/ai/`:
