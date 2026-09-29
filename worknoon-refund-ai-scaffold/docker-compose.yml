@@ -2,8 +2,9 @@ services:
   mongo:
     image: mongo:8
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # No host port is published: the API reaches Mongo over the Compose network, and publishing 27017
+    # would expose an unauthenticated database and collide with any MongoDB already running locally.
+    # Inspect data with: docker compose exec mongo mongosh refund_ai
     volumes:
       - mongo_data:/data/db
     healthcheck:

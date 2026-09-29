@@ -14,24 +14,31 @@ A production-minded refund support application where AI interprets customer lang
 **The LLM does not approve refunds.** It classifies customer intent/reason and flags risky input. A deterministic policy engine makes the final `APPROVED`, `DENIED`, or `ESCALATED` decision using order facts and business rules.
 
 ## Run with Docker
+Requirements: Docker with Compose v2, and host ports **5173** (web) and **4000** (API) free.
+
 ```bash
-cp .env.example .env
+cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
 # Runs with AI_PROVIDER=mock by default (no key needed).
 # To use OpenAI, set AI_PROVIDER=openai and OPENAI_API_KEY=... in .env.
 docker compose up --build
 ```
 
-Frontend: `http://localhost:5173`
-API health: `http://localhost:4000/api/health`
+- **Frontend:** `http://localhost:5173` (customer assistant) and `http://localhost:5173/admin` (support dashboard).
+- **Use `localhost`, not `127.0.0.1`.** The API only allows browser requests from `CLIENT_ORIGIN` (default `http://localhost:5173`).
+- **API health:** `http://localhost:4000/api/health`, which returns `{"ok":true,"db":"connected"}` once ready (about 20 seconds on first start).
+
+The MongoDB container is not published on a host port, so it can't clash with a MongoDB you already run. To inspect data, use `docker compose exec mongo mongosh refund_ai`.
 
 ### Seed data
 On API startup, the backend automatically inserts the 15 synthetic customers and their 21 demo orders (1–3 per customer, covering every policy branch) if they are missing. Records are upserted by customer email / order number, so restarting containers never duplicates data and existing records are left untouched. Fixtures live in `apps/api/src/data/seedData.ts`.
 
-`npm --prefix apps/api run seed` is also idempotent: it re-applies the fixtures and refreshes order dates relative to today (useful because 30-day-window scenarios drift as the database ages). It never deletes data, so refund audit records stay valid.
+Refreshing the fixtures is also idempotent. It re-applies them and moves order dates relative to today, which matters because 30-day-window scenarios drift as the database ages. It never deletes data, so refund audit records stay valid.
+- With Docker: `docker compose exec api node dist/data/seed.js`
+- Without Docker: `npm --prefix apps/api run seed`
 
 To start from a completely empty database: `docker compose down -v`.
 
-For non-Docker development:
+For non-Docker development (requires Node 22+ and your own MongoDB at `mongodb://localhost:27017`, since the Compose MongoDB is not exposed on the host):
 ```bash
 npm install
 npm run install:all
