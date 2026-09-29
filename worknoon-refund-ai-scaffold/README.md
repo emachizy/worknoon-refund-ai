@@ -63,6 +63,8 @@ npm run dev
 - Damaged or incorrect items under the threshold and inside the return window: approved.
 - Unmatched cases: escalated.
 
+Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full precedence, reason codes and rationale: `docs/REFUND_POLICY.md`. Policy tests run with no database or API key: `npm test`.
+
 ## Next work
 See `docs/PLAN.md` and `CLAUDE.md`.
 

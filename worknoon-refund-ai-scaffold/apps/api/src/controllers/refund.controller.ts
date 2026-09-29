@@ -5,6 +5,7 @@ import { RefundRequest } from '../models/RefundRequest.js';
 import { createRefundSchema } from '../validators/refund.validator.js';
 import { classifyRefundMessage } from '../services/ai.service.js';
 import { evaluateRefundPolicy } from '../services/policy.service.js';
+import { explainPolicyDecision } from '../services/policyExplanation.js';
 
 export async function createRefund(req: Request, res: Response) {
   const input = createRefundSchema.parse(req.body);
@@ -12,25 +13,27 @@ export async function createRefund(req: Request, res: Response) {
   const order = await Order.findOne({ orderNumber: input.orderNumber });
 
   const classification = await classifyRefundMessage(input.message);
-  const ownsOrder = Boolean(customer && order && String(order.customerId) === String(customer._id));
-  const daysSinceOrder = order
-    ? Math.floor((Date.now() - order.orderedAt.getTime()) / (1000 * 60 * 60 * 24))
-    : Number.POSITIVE_INFINITY;
 
   const policy = evaluateRefundPolicy({
-    orderExists: Boolean(order),
-    ownsOrder,
-    isFinalSale: order?.isFinalSale ?? false,
-    daysSinceOrder,
-    refundAmount: order?.total ?? 0,
-    classification
+    requestingCustomerId: customer ? String(customer._id) : null,
+    order: order
+      ? {
+          customerId: String(order.customerId),
+          total: order.total,
+          orderedAt: order.orderedAt,
+          isFinalSale: order.isFinalSale ?? false
+        }
+      : null,
+    signals: classification,
+    evaluatedAt: new Date()
   });
+  const explanation = explainPolicyDecision(policy.reasonCode);
 
-  if (!customer || !order || !ownsOrder) {
+  if (!customer || !order || policy.reasonCode === 'ORDER_CUSTOMER_MISMATCH') {
     return res.status(200).json({
       decision: policy.decision,
       humanReviewRequired: policy.humanReviewRequired,
-      explanation: policy.explanation,
+      explanation,
       matchedRules: policy.matchedRules
     });
   }
@@ -42,6 +45,7 @@ export async function createRefund(req: Request, res: Response) {
     message: input.message,
     amount: order.total,
     ...policy,
+    explanation,
     aiClassification: classification
   });
 

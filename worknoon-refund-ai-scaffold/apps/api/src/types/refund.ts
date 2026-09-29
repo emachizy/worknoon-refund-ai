@@ -16,20 +16,3 @@ export interface AiClassification {
   promptInjectionDetected: boolean;
   extractedFacts: string[];
 }
-
-export interface PolicyInput {
-  orderExists: boolean;
-  ownsOrder: boolean;
-  isFinalSale: boolean;
-  daysSinceOrder: number;
-  refundAmount: number;
-  classification: AiClassification;
-}
-
-export interface PolicyResult {
-  decision: RefundDecision;
-  humanReviewRequired: boolean;
-  reasonCode: string;
-  explanation: string;
-  matchedRules: string[];
-}
