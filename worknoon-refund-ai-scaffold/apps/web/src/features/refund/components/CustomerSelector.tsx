@@ -1,5 +1,5 @@
 import type { Customer } from '../../../types';
-import type { Resource } from '../useResource';
+import type { Resource } from '../../../lib/useResource';
 import { loadErrorMessage } from '../messages';
 
 interface Props {

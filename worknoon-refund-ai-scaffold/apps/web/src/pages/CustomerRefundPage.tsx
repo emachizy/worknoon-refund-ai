@@ -6,7 +6,7 @@ import { MESSAGE_MIN_LENGTH, RefundMessageField } from '../features/refund/compo
 import { RefundResultCard } from '../features/refund/components/RefundResultCard';
 import { submitErrorMessage } from '../features/refund/messages';
 import { useRefundSubmission, type SubmissionOptions } from '../features/refund/useRefundSubmission';
-import { useResource } from '../features/refund/useResource';
+import { useResource } from '../lib/useResource';
 
 interface FieldErrors {
   order?: string;

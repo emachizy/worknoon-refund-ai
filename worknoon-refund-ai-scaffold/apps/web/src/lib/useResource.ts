@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isAbort } from '../../api/client';
+import { isAbort } from '../api/client';
 
 export type Resource<T> =
   | { status: 'idle' }

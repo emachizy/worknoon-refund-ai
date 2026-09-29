@@ -78,4 +78,4 @@ Consequences of this order:
   matchedRules: ['ORDER_OWNED_BY_CUSTOMER', 'NOT_FINAL_SALE', 'WITHIN_RETURN_WINDOW', 'NO_RISK_SIGNALS', 'HIGH_VALUE_REFUND']
 }
 ```
-`matchedRules` lists every check that was evaluated, in order, with its outcome, ending at the rule that decided the result.
+`matchedRules` lists every check that was evaluated, in order, with its outcome. When several risk flags are raised, all of them are recorded, so the reason code, not the last rule, is the authoritative statement of why the decision was made.

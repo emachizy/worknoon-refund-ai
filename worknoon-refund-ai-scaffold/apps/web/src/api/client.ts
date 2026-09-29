@@ -1,4 +1,20 @@
-import type { Customer, Order, RefundDecision, RefundRequestPayload, RefundResult, RefundSummary } from '../types';
+import type {
+  AuditEvent,
+  AuditValue,
+  ClassificationAudit,
+  ClassificationResult,
+  ClassificationStatus,
+  Customer,
+  DecisionFacts,
+  Order,
+  RefundDecision,
+  RefundDetail,
+  RefundListQuery,
+  RefundPage,
+  RefundRequestPayload,
+  RefundResult,
+  RefundSummary
+} from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
 
@@ -103,8 +119,110 @@ export const parseRefundResult: Parser<RefundResult> = (v) =>
       }
     : null;
 
-const parseRefundPage: Parser<RefundSummary[]> = (v) =>
-  isRecord(v) && Array.isArray(v.items) ? (v.items as RefundSummary[]) : null;
+// ---------- admin parsers: identity + decision are required; everything else degrades to null ----------
+
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const bool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const STATUSES: readonly ClassificationStatus[] = ['SUCCEEDED', 'FAILED', 'SKIPPED'];
+const status = (v: unknown): ClassificationStatus | null => (STATUSES.includes(v as ClassificationStatus) ? (v as ClassificationStatus) : null);
+
+const parseRefundSummary: Parser<RefundSummary> = (v) =>
+  isRecord(v) && typeof v.requestId === 'string' && typeof v.orderNumber === 'string' && isDecision(v.decision)
+    ? {
+        requestId: v.requestId,
+        createdAt: str(v.createdAt),
+        customerName: str(v.customerName),
+        orderNumber: v.orderNumber,
+        amount: num(v.amount),
+        decision: v.decision,
+        reasonCode: str(v.reasonCode),
+        humanReviewRequired: bool(v.humanReviewRequired),
+        classificationStatus: status(v.classificationStatus)
+      }
+    : null;
+
+export const parseRefundPage: Parser<RefundPage> = (v) => {
+  if (!isRecord(v)) return null;
+  const items = listOf(parseRefundSummary)(v.items);
+  return items ? { items, limit: num(v.limit) ?? items.length } : null;
+};
+
+const parseFacts = (v: unknown): DecisionFacts | null =>
+  isRecord(v)
+    ? {
+        evaluatedAt: str(v.evaluatedAt),
+        customerFound: bool(v.customerFound),
+        customerName: str(v.customerName),
+        orderFound: bool(v.orderFound),
+        ownershipVerified: bool(v.ownershipVerified),
+        itemName: str(v.itemName),
+        orderTotal: num(v.orderTotal),
+        orderedAt: str(v.orderedAt),
+        isFinalSale: bool(v.isFinalSale)
+      }
+    : null;
+
+const parseClassificationResult = (v: unknown): ClassificationResult | null =>
+  isRecord(v)
+    ? {
+        intent: str(v.intent),
+        reason: str(v.reason),
+        confidence: num(v.confidence),
+        suspicious: bool(v.suspicious),
+        conflicting: bool(v.conflicting),
+        promptInjectionDetected: bool(v.promptInjectionDetected),
+        extractedFacts: strings(v.extractedFacts)
+      }
+    : null;
+
+const parseClassification = (v: unknown): ClassificationAudit | null =>
+  isRecord(v)
+    ? {
+        status: status(v.status),
+        provider: str(v.provider),
+        failureKind: str(v.failureKind),
+        durationMs: num(v.durationMs),
+        result: parseClassificationResult(v.result)
+      }
+    : null;
+
+const parseAuditEvent = (v: unknown): AuditEvent | null => {
+  if (!isRecord(v) || typeof v.type !== 'string') return null;
+  const data: Record<string, AuditValue> = {};
+  if (isRecord(v.data)) {
+    for (const [key, value] of Object.entries(v.data)) {
+      if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) data[key] = value as AuditValue;
+    }
+  }
+  return { type: v.type, at: str(v.at), data };
+};
+
+export const parseRefundDetail: Parser<RefundDetail> = (v) => {
+  if (!isRecord(v) || typeof v.requestId !== 'string' || !isRecord(v.outcome) || !isDecision(v.outcome.decision)) return null;
+  const request = isRecord(v.request) ? v.request : {};
+  const outcome = v.outcome;
+  return {
+    requestId: v.requestId,
+    createdAt: str(v.createdAt),
+    request: { customerId: str(request.customerId), orderNumber: str(request.orderNumber), message: str(request.message) },
+    facts: parseFacts(v.facts),
+    classification: parseClassification(v.classification),
+    outcome: {
+      decision: outcome.decision as RefundDecision,
+      reasonCode: str(outcome.reasonCode),
+      humanReviewRequired: bool(outcome.humanReviewRequired),
+      explanation: str(outcome.explanation),
+      matchedRules: strings(outcome.matchedRules),
+      decidedBy: str(outcome.decidedBy),
+      amount: num(outcome.amount)
+    },
+    auditEvents: Array.isArray(v.auditEvents)
+      ? v.auditEvents.map(parseAuditEvent).filter((e): e is AuditEvent => e !== null)
+      : []
+  };
+};
 
 // ---------- endpoints ----------
 
@@ -144,6 +262,16 @@ export const api = {
     }
   },
 
-  /** Support dashboard list (admin). */
-  refunds: () => request('/refunds', parseRefundPage)
+  /** Support dashboard list. Filtering is done by the server. */
+  refunds: (query: RefundListQuery = {}, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (query.decision) params.set('decision', query.decision);
+    if (query.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return request(`/refunds${qs ? `?${qs}` : ''}`, parseRefundPage, { signal });
+  },
+
+  /** Support dashboard audit detail for one request. */
+  refund: (requestId: string, signal?: AbortSignal) =>
+    request(`/refunds/${encodeURIComponent(requestId)}`, parseRefundDetail, { signal })
 };

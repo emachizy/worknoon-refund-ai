@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { formatCurrency, formatDate } from '../../../lib/format';
 import type { Order } from '../../../types';
-import type { Resource } from '../useResource';
+import type { Resource } from '../../../lib/useResource';
 import { loadErrorMessage } from '../messages';
 
 interface Props {

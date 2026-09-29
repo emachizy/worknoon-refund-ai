@@ -17,3 +17,11 @@ export function formatDateTime(iso: string): string {
     ? ''
     : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
+
+/** Time with seconds, for audit timelines where events are close together. */
+export function formatTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(date);
+}

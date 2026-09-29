@@ -92,6 +92,26 @@ Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full 
 
 Code: `apps/web/src/pages/CustomerRefundPage.tsx`, `apps/web/src/features/refund/`, `apps/web/src/api/client.ts`.
 
+## Support dashboard (web)
+`http://localhost:5173/admin` is the internal support view. It is built on `GET /api/refunds` (server-side `decision` filter) and `GET /api/refunds/:id`.
+
+- **Overview cards:** Total, Approved, Denied and Needs review. They count the most recent requests loaded (up to 100), not all-time totals, and the caption says which.
+- **Filters:** All, Approved, Denied, and Needs review (`decision=ESCALATED`). The filter is kept in the URL (`?filter=denied`).
+- **Table:** customer, order, amount, outcome, reason, and time created, plus a marker when AI classification failed or was skipped. Each row has a **View** button, and clicking the row also works.
+- **Detail drawer**, one section per question:
+  - *Outcome:* decision, reason code, whether a human must review, which layer decided (`decidedBy`), and the exact wording the customer saw.
+  - *Customer request:* the message, shown as untrusted plain text.
+  - *Order facts:* the database snapshot used for the decision.
+  - *AI classification:* the structured fields, or the `FAILED` / `SKIPPED` state with provider and failure type.
+  - *Policy evaluation:* the ordered rule trace, with raw rule codes kept visible.
+  - *Audit timeline.*
+
+**Customer vs support data.** Customers only ever receive `{ requestId, decision, humanReviewRequired, explanation, createdAt }`. Reason codes, rule traces, classification output (including prompt-injection and suspicious flags), provider and failure details, and audit events appear **only** on this dashboard.
+
+The dashboard never shows API keys, raw provider errors, prompts, or model reasoning. None of these are stored, and the client discards unknown fields.
+
+> **No authentication.** Access control is intentionally outside this assessment's scope. The dashboard and its API endpoints expose customer messages and internal diagnostics to anyone who can reach them, so **do not deploy this to the internet without adding authentication and authorisation.**
+
 ## Tests
 `npm test` runs unit tests (policy, AI layer, config) and HTTP integration tests. No API key is needed, and no network calls are made.
 - **Where integration tests run.** They start a throwaway MongoDB via `mongodb-memory-server`, not your development database.
