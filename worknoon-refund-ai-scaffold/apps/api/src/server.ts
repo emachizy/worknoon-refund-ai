@@ -1,11 +1,16 @@
 import mongoose from 'mongoose';
-import { app } from './app.js';
+import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { ensureSeedData } from './data/ensureSeedData.js';
+import { RefundRequest } from './models/RefundRequest.js';
+import { createClassifierFromEnv } from './services/ai.service.js';
 
 async function start() {
+  const app = createApp({ classifier: createClassifierFromEnv() });
   await mongoose.connect(env.MONGO_URI);
   await ensureSeedData();
+  // The idempotency-key unique index must exist before requests arrive.
+  await RefundRequest.init();
   const server = app.listen(env.PORT, () => {
     console.log(`API listening on http://localhost:${env.PORT}`);
   });

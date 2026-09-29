@@ -1,64 +1,51 @@
 import type { Request, Response } from 'express';
-import { Customer } from '../models/Customer.js';
-import { Order } from '../models/Order.js';
 import { RefundRequest } from '../models/RefundRequest.js';
-import { createRefundSchema } from '../validators/refund.validator.js';
-import { classifyRefundMessage } from '../services/ai.service.js';
-import { evaluateRefundPolicy } from '../services/policy.service.js';
-import { explainPolicyDecision } from '../services/policyExplanation.js';
+import { submitRefundRequest, type RefundWorkflowDeps, type StoredRefundRequest } from '../services/refundWorkflow.js';
+import { toAdminDetail, toAdminSummary, toCustomerResponse } from '../services/refundViews.js';
+import {
+  createRefundSchema,
+  idempotencyKeySchema,
+  listRefundsQuerySchema,
+  objectIdSchema
+} from '../validators/refund.validator.js';
 
-export async function createRefund(req: Request, res: Response) {
-  const input = createRefundSchema.parse(req.body);
-  const customer = await Customer.findById(input.customerId);
-  const order = await Order.findOne({ orderNumber: input.orderNumber });
+export function createRefundController(deps: RefundWorkflowDeps) {
+  return {
+    async create(req: Request, res: Response) {
+      const input = createRefundSchema.parse(req.body);
+      const idempotencyKey = idempotencyKeySchema.parse(req.get('Idempotency-Key'));
 
-  const classification = await classifyRefundMessage(input.message);
+      const { record, replayed } = await submitRefundRequest(input, idempotencyKey, deps);
+      if (replayed) res.set('Idempotent-Replayed', 'true');
+      res.status(replayed ? 200 : 201).json(toCustomerResponse(record));
+    },
 
-  const policy = evaluateRefundPolicy({
-    requestingCustomerId: customer ? String(customer._id) : null,
-    order: order
-      ? {
-          customerId: String(order.customerId),
-          total: order.total,
-          orderedAt: order.orderedAt,
-          isFinalSale: order.isFinalSale ?? false
-        }
-      : null,
-    signals: classification,
-    evaluatedAt: new Date()
-  });
-  const explanation = explainPolicyDecision(policy.reasonCode);
+    async list(req: Request, res: Response) {
+      const query = listRefundsQuerySchema.parse(req.query);
+      const filter: Record<string, unknown> = {};
+      if (query.decision) filter.decision = query.decision;
+      if (query.humanReviewRequired !== undefined) filter.humanReviewRequired = query.humanReviewRequired;
 
-  if (!customer || !order || policy.reasonCode === 'ORDER_CUSTOMER_MISMATCH') {
-    return res.status(200).json({
-      decision: policy.decision,
-      humanReviewRequired: policy.humanReviewRequired,
-      explanation,
-      matchedRules: policy.matchedRules
-    });
-  }
+      const records = await RefundRequest.find(filter)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(query.limit)
+        .lean<StoredRefundRequest[]>();
+      // Envelope leaves room for pagination fields (e.g. a cursor) without breaking clients.
+      res.json({ items: records.map(toAdminSummary), limit: query.limit });
+    },
 
-  const refund = await RefundRequest.create({
-    customerId: customer._id,
-    orderId: order._id,
-    orderNumber: order.orderNumber,
-    message: input.message,
-    amount: order.total,
-    ...policy,
-    explanation,
-    aiClassification: classification
-  });
-
-  return res.status(201).json(refund);
-}
-
-export async function listRefunds(_req: Request, res: Response) {
-  const refunds = await RefundRequest.find().sort({ createdAt: -1 }).limit(100).lean();
-  res.json(refunds);
-}
-
-export async function getRefund(req: Request, res: Response) {
-  const refund = await RefundRequest.findById(req.params.id).lean();
-  if (!refund) return res.status(404).json({ message: 'Refund request not found' });
-  res.json(refund);
+    async get(req: Request, res: Response) {
+      const parsed = objectIdSchema.safeParse(req.params.id);
+      if (!parsed.success) {
+        res.status(400).json({ message: 'Invalid refund request id' });
+        return;
+      }
+      const record = await RefundRequest.findById(parsed.data).lean<StoredRefundRequest>();
+      if (!record) {
+        res.status(404).json({ message: 'Refund request not found' });
+        return;
+      }
+      res.json(toAdminDetail(record));
+    }
+  };
 }

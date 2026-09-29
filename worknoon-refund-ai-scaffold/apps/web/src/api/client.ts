@@ -14,7 +14,8 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   customers: () => json<Customer[]>('/customers'),
   orders: (customerId: string) => json<Order[]>(`/customers/${customerId}/orders`),
-  refunds: () => json<RefundResult[]>('/refunds'),
+  // The list endpoint returns a pagination-ready envelope: { items, limit }.
+  refunds: () => json<{ items: RefundResult[] }>('/refunds').then((page) => page.items),
   createRefund: (payload: { customerId: string; orderNumber: string; message: string }) =>
     json<RefundResult>('/refunds', { method: 'POST', body: JSON.stringify(payload) })
 };

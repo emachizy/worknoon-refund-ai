@@ -25,6 +25,8 @@ The policy is implemented as a pure function, `evaluateRefundPolicy` in `apps/ap
 - **Auditability.** Every decision records a reason code and the ordered list of rules evaluated, so a reviewer can see exactly why an outcome was reached and replay it.
 - **Testability.** The engine takes every fact as an argument (including the evaluation time) and touches no database, network, AI provider, environment variable, or clock. The same input always gives the same output, and the tests need no API key or database.
 
+The engine is not consulted when AI classification fails. In that case the refund workflow escalates with `AI_CLASSIFICATION_UNAVAILABLE`, because an infrastructure outage is not a policy fact (see `ARCHITECTURE.md`).
+
 The engine does not produce customer-facing wording. The API maps the reason code to static text, and any later AI-generated wording is presentation only.
 
 ### Inputs

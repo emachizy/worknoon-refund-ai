@@ -40,12 +40,23 @@ npm run dev
 ```
 
 ## Core API
-- `GET /api/health`
-- `GET /api/customers`
-- `GET /api/customers/:id/orders`
-- `POST /api/refunds`
-- `GET /api/refunds`
-- `GET /api/refunds/:id`
+| Endpoint | Notes |
+| --- | --- |
+| `GET /api/health` | 503 when the database is disconnected |
+| `GET /api/customers` | Demo customers |
+| `GET /api/customers/:id/orders` | 400 on a malformed id |
+| `POST /api/refunds` | Runs the workflow. Returns 201 with the customer response, or 400 on an invalid payload. Optional `Idempotency-Key` header: a replay returns 200, and a key reused for a different payload returns 409. |
+| `GET /api/refunds` | Admin list, newest first: `{ items, limit }`. Filters: `decision`, `humanReviewRequired`, `limit` (1 to 100). |
+| `GET /api/refunds/:id` | Admin audit detail: submitted request, facts snapshot, classification, outcome, audit events |
+
+### Refund lifecycle
+Validate, then load the customer and order, then verify ownership, then classify (skipped if ownership fails), then decide, then **persist one audit record**, then respond.
+- The deterministic policy engine makes every normal decision.
+- An AI failure is escalated by the workflow itself.
+- A malformed payload (including a malformed customer id) returns 400 and is not persisted.
+- A well-formed request for an unknown customer or order, or someone else's order, is **persisted** as `DENIED`.
+
+The customer response is `{ requestId, decision, humanReviewRequired, reasonCode, explanation, matchedRules, createdAt }`, with no AI output or provider details. The admin detail endpoint exposes the full audit trail. See `docs/ARCHITECTURE.md`.
 
 ## Example refund request
 ```json
@@ -64,7 +75,16 @@ npm run dev
 - Damaged or incorrect items under the threshold and inside the return window: approved.
 - Unmatched cases: escalated.
 
-Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full precedence, reason codes and rationale: `docs/REFUND_POLICY.md`. Policy tests run with no database or API key: `npm test`.
+Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full precedence, reason codes and rationale: `docs/REFUND_POLICY.md`.
+
+## Tests
+`npm test` runs unit tests (policy, AI layer, config) and HTTP integration tests. No API key is needed, and no network calls are made.
+- **Where integration tests run.** They start a throwaway MongoDB via `mongodb-memory-server`, not your development database.
+- **First run.** It downloads a `mongod` binary.
+- **Using an installed MongoDB.** Point to it instead of downloading:
+  ```bash
+  MONGOMS_SYSTEM_BINARY="/path/to/mongod" npm test
+  ```
 
 ## AI classification
 The AI converts the customer's message into validated signals (`reason`, `suspicious`, `conflicting`, `promptInjectionDetected`, and so on). It never returns or influences a decision beyond those signals.
@@ -79,7 +99,7 @@ The AI converts the customer's message into validated signals (`reason`, `suspic
 - **Mock mode** is a deterministic phrase matcher for tests, offline work and reviewers without a key. It is not a language model.
 - **Only the refund message** is sent to OpenAI, inside delimiters, with a fixed system prompt. No customer or order data is sent.
 - **Prompt-injection handling** is defense in depth: prompt isolation, model flags, and a small deterministic detector. Any flag escalates. None of this makes the system injection-proof. Its purpose is to reduce the risk of policy bypass, and the model has no authority to bypass policy anyway.
-- **If classification fails** (timeout, provider error, invalid output after one retry), no refund decision is made. The API currently returns `503`.
+- **If classification fails** (timeout, provider error, invalid output after one retry), the request is **escalated** to human review with reason `AI_CLASSIFICATION_UNAVAILABLE`. It is never approved or denied, and the customer is not told which vendor or failure was involved.
 
 Details: `docs/AI_CLASSIFICATION.md`.
 
