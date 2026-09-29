@@ -77,6 +77,21 @@ The customer response is `{ requestId, decision, humanReviewRequired, explanatio
 
 Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full precedence, reason codes and rationale: `docs/REFUND_POLICY.md`.
 
+## Customer refund assistant (web)
+`http://localhost:5173/` is the customer flow:
+1. Pick a customer.
+2. Pick one of their orders. Each order is a card showing item, order number, price, order date, and a final-sale tag where relevant.
+3. Describe the problem (5 to 2000 characters).
+4. Submit and see the outcome: **Refund approved**, **Refund not approved**, or **Manual review required**, with a reference number.
+
+- **What the result shows.** The wording comes from the API's customer-safe `explanation`. The UI never shows reason codes, rule traces, or AI/provider details.
+- **Idempotency.** Each logical request gets one `Idempotency-Key` (`crypto.randomUUID()`, with a `getRandomValues` fallback outside secure contexts). One automatic retry on a network/502/503/504 failure, and "Try again" after an error, both reuse the key. Changing the order or message, or starting a new request, creates a new key.
+- **Double submission.** The submit button is disabled while a request is in flight, and a second submit is ignored even before re-render.
+- **"Submit another request"** keeps the selected customer and clears the order, message, result and key.
+- **Errors.** Loading and submission errors show friendly text with a retry. Server messages are never displayed.
+
+Code: `apps/web/src/pages/CustomerRefundPage.tsx`, `apps/web/src/features/refund/`, `apps/web/src/api/client.ts`.
+
 ## Tests
 `npm test` runs unit tests (policy, AI layer, config) and HTTP integration tests. No API key is needed, and no network calls are made.
 - **Where integration tests run.** They start a throwaway MongoDB via `mongodb-memory-server`, not your development database.
@@ -85,6 +100,12 @@ Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full 
   ```bash
   MONGOMS_SYSTEM_BINARY="/path/to/mongod" npm test
   ```
+
+Frontend tests (Vitest, Testing Library and jsdom; `fetch` is mocked, so no backend is needed):
+```bash
+npm --prefix apps/web test        # component and flow tests
+npm --prefix apps/web run typecheck   # type-checks app and test code
+```
 
 ## AI classification
 The AI converts the customer's message into validated signals (`reason`, `suspicious`, `conflicting`, `promptInjectionDetected`, and so on). It never returns or influences a decision beyond those signals.
