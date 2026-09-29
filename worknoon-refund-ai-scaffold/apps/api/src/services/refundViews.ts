@@ -8,15 +8,17 @@ import type { StoredRefundRequest } from './refundWorkflow.js';
 const iso = (value: Date | null | undefined) => (value ? new Date(value).toISOString() : null);
 const id = (value: { toString(): string } | null | undefined) => (value ? value.toString() : null);
 
-/** Customer-facing result of POST /api/refunds. No AI output, provider names, or failure details. */
+/**
+ * Customer-facing result of POST /api/refunds: the outcome and customer-safe wording only.
+ * Reason codes, the policy rule trace, AI output, provider and failure details, and security
+ * flags are internal diagnostics and appear only in the admin endpoints.
+ */
 export function toCustomerResponse(record: StoredRefundRequest) {
   return {
     requestId: String(record._id),
     decision: record.decision,
     humanReviewRequired: record.humanReviewRequired,
-    reasonCode: record.reasonCode,
     explanation: record.explanation,
-    matchedRules: record.matchedRules,
     createdAt: iso(record.createdAt)
   };
 }

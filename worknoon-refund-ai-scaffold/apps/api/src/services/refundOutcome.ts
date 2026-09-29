@@ -32,19 +32,29 @@ export const AI_UNAVAILABLE_OUTCOME: RefundOutcome = {
   matchedRules: []
 };
 
-// Static, reason-code-driven customer wording. Customer text and provider details never flow in here.
+/**
+ * Static, customer-safe wording chosen by reason code. Customer text and provider details never flow in here.
+ *
+ * Every escalation uses the same sentence, so a customer cannot tell a security escalation
+ * (prompt injection, suspicious request) from a routine one (high value, unclear reason,
+ * AI unavailable). Wording never mentions fraud, injection, detection, vendors, or internal rules.
+ */
+const APPROVED_MESSAGE = 'Your refund request has been approved.';
+const ESCALATED_MESSAGE = 'Your request requires manual review. Our support team will review it.';
+const ORDER_NOT_VERIFIED_MESSAGE = 'We could not verify this order for your account.';
+
 const EXPLANATIONS: Record<OutcomeReasonCode, string> = {
-  INVALID_ORDER_REFERENCE: 'We could not verify this order for the customer.',
-  ORDER_CUSTOMER_MISMATCH: 'We could not verify this order for the customer.',
-  FINAL_SALE: 'Final-sale items are not eligible for refunds.',
-  RETURN_WINDOW_EXPIRED: `The order is outside the ${REFUND_WINDOW_DAYS}-day refund window.`,
-  PROMPT_INJECTION_DETECTED: 'This request requires human review.',
-  SUSPICIOUS_REQUEST: 'This request requires human review because it contains conflicting or unusual details.',
-  HIGH_VALUE_REVIEW_REQUIRED: 'Refunds above $500 require human review.',
-  DAMAGED_ITEM: 'The request qualifies because the item was reported damaged.',
-  INCORRECT_ITEM: 'The request qualifies because the customer reported receiving the wrong item.',
-  POLICY_UNCLEAR: 'The request does not match an automatic approval or denial rule and needs human review.',
-  AI_CLASSIFICATION_UNAVAILABLE: 'Your request requires manual review because our automated assessment could not be completed.'
+  INVALID_ORDER_REFERENCE: ORDER_NOT_VERIFIED_MESSAGE,
+  ORDER_CUSTOMER_MISMATCH: ORDER_NOT_VERIFIED_MESSAGE,
+  FINAL_SALE: 'This order is not eligible for a refund under the refund policy.',
+  RETURN_WINDOW_EXPIRED: `This order is outside the ${REFUND_WINDOW_DAYS}-day refund window.`,
+  PROMPT_INJECTION_DETECTED: ESCALATED_MESSAGE,
+  SUSPICIOUS_REQUEST: ESCALATED_MESSAGE,
+  HIGH_VALUE_REVIEW_REQUIRED: ESCALATED_MESSAGE,
+  POLICY_UNCLEAR: ESCALATED_MESSAGE,
+  AI_CLASSIFICATION_UNAVAILABLE: ESCALATED_MESSAGE,
+  DAMAGED_ITEM: APPROVED_MESSAGE,
+  INCORRECT_ITEM: APPROVED_MESSAGE
 };
 
 export function explainOutcome(reasonCode: OutcomeReasonCode): string {

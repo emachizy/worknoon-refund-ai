@@ -56,7 +56,7 @@ Validate, then load the customer and order, then verify ownership, then classify
 - A malformed payload (including a malformed customer id) returns 400 and is not persisted.
 - A well-formed request for an unknown customer or order, or someone else's order, is **persisted** as `DENIED`.
 
-The customer response is `{ requestId, decision, humanReviewRequired, reasonCode, explanation, matchedRules, createdAt }`, with no AI output or provider details. The admin detail endpoint exposes the full audit trail. See `docs/ARCHITECTURE.md`.
+The customer response is `{ requestId, decision, humanReviewRequired, explanation, createdAt }`, where `explanation` is customer-safe wording. Reason codes, the policy rule trace, AI output, provider and failure details, and security flags are internal: they appear only in the admin endpoints. See `docs/ARCHITECTURE.md`.
 
 ## Example refund request
 ```json

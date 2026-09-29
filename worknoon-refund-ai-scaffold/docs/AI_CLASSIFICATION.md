@@ -92,7 +92,7 @@ Every failure surfaces as a `ClassificationError` with a `kind`:
 Worst-case latency is therefore about two timeouts.
 
 - **Never a decision.** A classification failure is never turned into `APPROVED` or `DENIED`.
-- **What the workflow does.** It catches the failure and records an `ESCALATED` outcome with reason code `AI_CLASSIFICATION_UNAVAILABLE` and `decidedBy: WORKFLOW`. The request is persisted with `classification: { status: FAILED, provider, failureKind, durationMs }`, and the customer sees: "Your request requires manual review because our automated assessment could not be completed." See `ARCHITECTURE.md` for why this is an orchestration decision rather than a policy rule.
+- **What the workflow does.** It catches the failure and records an `ESCALATED` outcome with reason code `AI_CLASSIFICATION_UNAVAILABLE` and `decidedBy: WORKFLOW`. The request is persisted with `classification: { status: FAILED, provider, failureKind, durationMs }`, and the customer sees the same generic escalation message as every other escalation: "Your request requires manual review. Our support team will review it." See `ARCHITECTURE.md` for why this is an orchestration decision rather than a policy rule.
 - **When the AI is not called at all.** If the customer or order doesn't exist, or the order belongs to someone else, the message is never sent to the AI and the request is denied on facts.
 - **What is logged.** Provider, model, attempt, duration, failure kind, HTTP status, provider error code, and request id.
 - **What is not logged or returned.** Provider error messages (OpenAI auth errors echo part of the key), the API key, customer text, and model output. Schema failures log only the failing field paths.

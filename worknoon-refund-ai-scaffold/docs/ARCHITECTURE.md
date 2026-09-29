@@ -78,7 +78,9 @@ Indexes: `createdAt`, `decision + createdAt`, `customerId + createdAt`, and a un
 ## Customer response vs admin audit data
 | | Customer (`POST /api/refunds`) | Admin (`GET /api/refunds`, `GET /api/refunds/:id`) |
 | --- | --- | --- |
-| Decision, reason code, explanation, rule trace | Yes | Yes |
+| Decision, human-review flag, customer-safe explanation | Yes | Yes |
+| Reason code, policy rule trace, `decidedBy` | **No** | Yes (reason code in list and detail; trace and `decidedBy` in detail) |
+| Security flags (prompt injection, suspicious) | **No** | Yes (detail, inside the classification result) |
 | AI classification output | **No** | Yes (detail) |
 | AI provider and failure kind | **No** (generic wording only) | Yes (detail) |
 | Authoritative facts snapshot | No | Yes (detail) |
@@ -99,8 +101,21 @@ Responses are built by explicit mappers (`services/refundViews.ts`), never by se
 Customer response contract:
 ```ts
 { requestId: string; decision: 'APPROVED' | 'DENIED' | 'ESCALATED'; humanReviewRequired: boolean;
-  reasonCode: string; explanation: string; matchedRules: string[]; createdAt: string }
+  explanation: string; createdAt: string }
 ```
+
+### Customer-facing wording
+`explanation` is static text chosen by reason code (`services/refundOutcome.ts`). It never reveals internal rules, AI output, vendors, or detection:
+
+| Outcome | Customer sees |
+| --- | --- |
+| Approved (damaged or incorrect item) | "Your refund request has been approved." |
+| Final sale | "This order is not eligible for a refund under the refund policy." |
+| Outside window | "This order is outside the 30-day refund window." |
+| Unknown customer/order, or someone else's order | "We could not verify this order for your account." (identical, so order existence isn't revealed) |
+| **Every** escalation (high value, unclear reason, prompt injection, suspicious, AI unavailable) | "Your request requires manual review. Our support team will review it." |
+
+All escalations share one sentence on purpose. A customer probing the system cannot tell whether a message triggered injection or fraud detection or merely needed review. The stored record keeps the precise reason code for staff.
 
 ### Request validation (400) vs business denial (DENIED)
 - **400:** the payload cannot identify a refund attempt. Examples: missing fields, malformed JSON, a customer id that is not an ObjectId, or an operator object instead of a string. Nothing is persisted.
