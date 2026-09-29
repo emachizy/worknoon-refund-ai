@@ -6,7 +6,7 @@ A production-minded refund support application where AI interprets customer lang
 - React + Vite + TypeScript
 - Node.js + Express + TypeScript
 - MongoDB + Mongoose
-- OpenAI-compatible AI classification layer with local fallback
+- AI classification layer: OpenAI (structured outputs) or a deterministic mock
 - Docker Compose
 - Vitest
 
@@ -16,7 +16,8 @@ A production-minded refund support application where AI interprets customer lang
 ## Run with Docker
 ```bash
 cp .env.example .env
-# Add OPENAI_API_KEY if desired. Without it, set AI_PROVIDER=mock.
+# Runs with AI_PROVIDER=mock by default (no key needed).
+# To use OpenAI, set AI_PROVIDER=openai and OPENAI_API_KEY=... in .env.
 docker compose up --build
 ```
 
@@ -64,6 +65,23 @@ npm run dev
 - Unmatched cases: escalated.
 
 Boundaries: day 30 is inside the window; exactly $500.00 is not escalated. Full precedence, reason codes and rationale: `docs/REFUND_POLICY.md`. Policy tests run with no database or API key: `npm test`.
+
+## AI classification
+The AI converts the customer's message into validated signals (`reason`, `suspicious`, `conflicting`, `promptInjectionDetected`, and so on). It never returns or influences a decision beyond those signals.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AI_PROVIDER` | `mock` | `mock` (deterministic keyword fallback) or `openai` |
+| `OPENAI_API_KEY` | none | Required when `AI_PROVIDER=openai`. The API refuses to start without it. |
+| `OPENAI_MODEL` | `gpt-5-mini` | Responses-API model with structured-output support |
+| `OPENAI_TIMEOUT_MS` | `15000` | Per-request timeout |
+
+- **Mock mode** is a deterministic phrase matcher for tests, offline work and reviewers without a key. It is not a language model.
+- **Only the refund message** is sent to OpenAI, inside delimiters, with a fixed system prompt. No customer or order data is sent.
+- **Prompt-injection handling** is defense in depth: prompt isolation, model flags, and a small deterministic detector. Any flag escalates. None of this makes the system injection-proof. Its purpose is to reduce the risk of policy bypass, and the model has no authority to bypass policy anyway.
+- **If classification fails** (timeout, provider error, invalid output after one retry), no refund decision is made. The API currently returns `503`.
+
+Details: `docs/AI_CLASSIFICATION.md`.
 
 ## Next work
 See `docs/PLAN.md` and `CLAUDE.md`.
